@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Hamster Combat</title>
+<style>
+:root{--panel:rgba(255,255,255,.1);--accent:#ff9f43;--text:#fff}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;font-family:'Segoe UI',Tahoma,Verdana,sans-serif}
+html,body{width:100%;height:100%;overflow:hidden;background:#0d0d1a;color:var(--text);touch-action:manipulation}
+button{font:inherit;color:inherit}
+#loader{position:fixed;inset:0;background:radial-gradient(circle,#222f3e,#10ac84);z-index:1000;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:opacity .5s}
+#loader h1{font-size:2.2rem;margin-bottom:16px;animation:pulse 1.2s infinite alternate}
+.bar{width:70%;height:14px;background:rgba(255,255,255,.2);border-radius:10px;overflow:hidden}
+.bar div{width:0;height:100%;background:linear-gradient(90deg,#ff9f43,#ff5252)}
+#game{width:100%;height:100%;max-width:480px;margin:0 auto;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));box-shadow:0 0 30px rgba(0,0,0,.6)}
+.panel{background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);border-radius:20px}
+.header{padding:12px 15px;text-align:center}
+.user-line{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.8rem;opacity:.9;margin-bottom:6px;min-height:28px}
+.user-line .who{display:flex;align-items:center;gap:6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.user-line img{width:24px;height:24px;border-radius:50%}
+.mini-btn{background:rgba(255,255,255,.15);border:0;border-radius:10px;padding:5px 10px;font-size:.78rem;cursor:pointer}
+.balance{display:flex;justify-content:center;align-items:center;gap:10px;font-size:2rem;font-weight:800;color:#f1c40f;text-shadow:0 2px 4px rgba(0,0,0,.5)}
+.balance span:first-child{animation:spin 3s linear infinite;display:inline-block}
+.stats{display:flex;justify-content:space-around;font-size:.88rem;opacity:.85;margin-top:4px}
+.stats b{color:var(--accent)} .stats .p{color:#2ecc71}
+.zone{flex:1;display:flex;justify-content:center;align-items:center;position:relative}
+#hamster{height:min(100%,360px);aspect-ratio:1/1;max-width:100%;position:relative;cursor:pointer;touch-action:manipulation;transition:transform .06s}
+#hamster.hit{transform:scale(.97)}
+#hamster canvas{width:100%;height:100%;display:block}
+#hamster .fb{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:160px}
+#hamster img.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none}
+.float{position:absolute;font-size:1.7rem;font-weight:900;pointer-events:none;animation:floatUp .7s ease-out forwards;text-shadow:0 3px 8px rgba(0,0,0,.8),0 0 10px var(--accent);z-index:50}
+.nav{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:8px}
+.nav button{background:rgba(255,255,255,.06);border:0;border-radius:12px;padding:9px 1px;font-size:.6rem;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.nav button:active{transform:scale(.95);background:rgba(255,255,255,.16)}
+.nav .i{font-size:1.35rem}
+.modal{position:absolute;left:0;bottom:-100%;width:100%;height:85%;background:#1e1e30;border-radius:28px 28px 0 0;padding:22px 18px;box-shadow:0 -10px 30px rgba(0,0,0,.5);transition:bottom .35s cubic-bezier(.2,.9,.3,1.05);z-index:500;display:flex;flex-direction:column}
+.modal.active{bottom:0}
+.mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid rgba(255,255,255,.06)}
+.mt{font-size:1.3rem;font-weight:700}
+.x{background:rgba(255,255,255,.1);border:0;width:36px;height:36px;border-radius:50%;font-size:1.3rem;cursor:pointer}
+.mc{flex:1;overflow-y:auto;padding-right:4px}
+.item{background:rgba(255,255,255,.05);border-radius:15px;padding:13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid transparent}
+.item.on{border-color:#2ecc71;background:rgba(46,204,113,.1)}
+.item h4{font-size:1rem;margin-bottom:3px}.item p{font-size:.8rem;opacity:.7}
+.item .em{font-size:2rem;margin-right:12px}
+.row{display:flex;align-items:center}
+.buy{background:linear-gradient(135deg,#ff9f43,#ff5252);border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.buy:disabled{background:#57606f;opacity:.6;cursor:not-allowed}
+.buy.ok{background:#2ecc71}.buy.alt{background:#341f97}
+.set{margin-bottom:18px}.set label{display:block;font-weight:600;margin-bottom:7px;font-size:.93rem}
+.set select,.set input[type=range]{width:100%;padding:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:#fff;border-radius:10px}
+.set select option{color:#000}
+.box{background:rgba(255,255,255,.04);padding:14px;border-radius:15px;border-left:4px solid var(--accent);margin-top:16px;font-size:.9rem;line-height:1.45}
+.box p{margin-bottom:8px}
+.mail{color:var(--accent);font-weight:700;text-decoration:none;word-break:break-all;user-select:text;-webkit-user-select:text}
+.gbtn{width:100%;background:#fff;color:#222;border:0;border-radius:12px;padding:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+.danger{background:#c0392b}
+.lb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:7px;background:rgba(255,255,255,.05)}
+.lb.me{background:rgba(255,159,67,.18);border:1px solid var(--accent)}
+.lb .n{width:28px;font-weight:800;text-align:center}.lb img{width:30px;height:30px;border-radius:50%}
+.lb .nm{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.lb .sc{font-weight:700;color:#f1c40f}
+.note{font-size:.82rem;opacity:.75;line-height:1.4;margin:8px 0}
+#toast{position:absolute;top:70px;left:50%;transform:translate(-50%,-30px);background:#10ac84;padding:10px 16px;border-radius:14px;font-size:.88rem;z-index:900;opacity:0;transition:.3s;pointer-events:none;max-width:90%;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.low *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important;text-shadow:none!important;filter:none!important}
+#fx{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.header,.zone,.nav{position:relative;z-index:1}
+.nav button{box-shadow:0 4px 0 rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.2)}
+.nav button:active{transform:translateY(3px)!important;box-shadow:0 1px 0 rgba(0,0,0,.38)!important}
+.buy{box-shadow:0 4px 0 #b53a2a,0 8px 14px rgba(0,0,0,.3)}
+.buy.ok{box-shadow:0 4px 0 #1b8f4d}.buy.alt{box-shadow:0 4px 0 #1f1263}.buy:disabled{box-shadow:0 4px 0 #3a4048}
+.buy:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #b53a2a}
+.header{box-shadow:0 6px 0 rgba(0,0,0,.25),0 14px 30px rgba(0,0,0,.35)}
+#loader svg{overflow:visible;filter:drop-shadow(0 10px 14px rgba(0,0,0,.4))}
+.wheel{transform-origin:100px 105px;animation:rot 2.4s linear infinite}
+.hb{animation:hop .3s ease-in-out infinite alternate}
+.leg{transform-box:fill-box;transform-origin:50% 0;animation:run .3s ease-in-out infinite alternate}
+.leg.b{animation-direction:alternate-reverse}
+#loader .sub{margin:6px 0 14px;opacity:.85;font-size:.95rem}
+@keyframes rot{to{transform:rotate(360deg)}}
+@keyframes hop{to{transform:translateY(-4px)}}
+@keyframes run{from{transform:rotate(35deg)}to{transform:rotate(-35deg)}}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.06)}}
+@keyframes spin{to{transform:rotateY(360deg)}}
+@keyframes floatUp{0%{opacity:0;transform:translateY(0) scale(.6)}20%{opacity:1;transform:translateY(-20px) scale(1.1)}100%{opacity:0;transform:translateY(-110px) scale(.8)}}
+.dg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.dt{background:rgba(255,255,255,.06);border-radius:14px;padding:10px 4px;text-align:center;font-size:.8rem;border:2px solid transparent}
+.dt b{display:block;color:#f1c40f;margin-top:4px}.dt.got{opacity:.4}.dt.now{border-color:var(--accent);background:rgba(255,159,67,.2);animation:pulse 1s infinite alternate}
+.dt.big{grid-column:span 4;font-size:1rem}
+.codein{width:100%;padding:12px;margin:8px 0;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:1.4rem;letter-spacing:.4em;text-align:center;user-select:text;-webkit-user-select:text}
+.prov{display:flex;gap:8px}.prov .buy{flex:1}
+.tin{width:100%;padding:10px;margin:4px 0;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;user-select:text;-webkit-user-select:text}
+</style>
+</head>
+<body>
+<div id="loader"><h1>HAMSTER COMBAT</h1>
+<svg viewBox="0 0 200 200" width="210" height="210">
+<g class="wheel" stroke="#ffd27f" fill="none"><circle cx="100" cy="105" r="82" stroke-width="7"/><path stroke-width="3" opacity=".8" d="M100 105L182 105M100 105L158 163M100 105L100 187M100 105L42 163M100 105L18 105M100 105L42 47M100 105L100 23M100 105L158 47"/></g>
+<g class="hb">
+<ellipse class="leg b" cx="86" cy="172" rx="7" ry="10" fill="#c27a35"/>
+<circle cx="66" cy="150" r="5" fill="#d08a40"/>
+<ellipse cx="100" cy="148" rx="34" ry="26" fill="#e9a55d"/>
+<ellipse cx="104" cy="156" rx="24" ry="16" fill="#fff0d6"/>
+<ellipse class="leg" cx="114" cy="172" rx="7" ry="10" fill="#d89548"/>
+<circle cx="134" cy="136" r="20" fill="#e9a55d"/>
+<circle cx="126" cy="118" r="7" fill="#e9a55d"/><circle cx="126" cy="118" r="4" fill="#ffa6b5"/>
+<circle cx="138" cy="146" r="8" fill="#f7cf9a"/>
+<circle cx="142" cy="133" r="3.2" fill="#111"/><circle cx="143" cy="132" r="1" fill="#fff"/>
+<circle cx="153" cy="139" r="2.6" fill="#ffa6b5"/>
+</g></svg>
+<div class="sub">Хомяк разминается…</div><div class="bar"><div id="lf"></div></div></div>
+
+<div id="game"><canvas id="fx"></canvas>
+  <div class="panel header">
+    <div class="user-line"><div class="who" id="who">Гость (прогресс только на этом устройстве)</div><button class="mini-btn" id="hdrAuth" onclick="doSignIn()">Войти</button></div>
+    <div class="balance"><span>🪙</span><span id="bal">0</span></div>
+    <div class="stats"><div>Тап: <b id="cp">+1</b></div><div>Пассивно: <b class="p" id="pi">+0/с</b></div></div>
+  </div>
+
+  <div class="zone"><div id="hamster"><canvas id="c3d"></canvas><img id="ph" class="photo" alt=""><div class="fb" id="fb"></div></div></div>
+
+  <div class="panel nav">
+    <button onclick="openModal('m-daily')"><span class="i">🎁</span>Бонус</button>
+    <button onclick="openModal('m-up')"><span class="i">⚡</span>Улучшения</button>
+    <button onclick="openModal('m-skin')"><span class="i">👕</span>Скины</button>
+    <button onclick="openModal('m-bg')"><span class="i">🖼️</span>Фоны</button>
+    <button onclick="openModal('m-top')"><span class="i">🏆</span>Топ</button>
+    <button onclick="openModal('m-set')"><span class="i">⚙️</span>Опции</button>
+  </div>
+
+  <div id="m-up" class="modal"><div class="mh"><div class="mt">⚡ Улучшения</div><button class="x" onclick="closeModals()">×</button></div><div class="mc" id="l-up"></div></div>
+  <div id="m-skin" class="modal"><div class="mh"><div class="mt">👕 Гардероб</div><button class="x" onclick="closeModals()">×</button></div><div class="mc" id="l-skin"></div></div>
+  <div id="m-bg" class="modal"><div class="mh"><div class="mt">🖼️ Локации</div><button class="x" onclick="closeModals()">×</button></div><div class="mc" id="l-bg"></div></div>
+
+  <div id="m-daily" class="modal"><div class="mh"><div class="mt">🎁 Ежедневный бонус</div><button class="x" onclick="closeModals()">×</button></div><div class="mc" id="l-daily"></div></div>
+
+  <div id="m-top" class="modal"><div class="mh"><div class="mt">🏆 Таблица лидеров</div><button class="x" onclick="closeModals()">×</button></div>
+    <div class="mc"><div id="lb-auth"></div><div id="lb-list"></div></div></div>
+
+  <div id="m-set" class="modal"><div class="mh"><div class="mt">⚙️ Настройки</div><button class="x" onclick="closeModals()">×</button></div>
+    <div class="mc">
+      <div class="set"><label>Аккаунт</label><div id="set-auth"></div></div>
+      <div class="set"><label>Подключение ботов (для владельца)</label>
+        <input class="tin" id="ad-pass" type="password" placeholder="Админ-код из консоли сервера">
+        <input class="tin" id="ad-tg" placeholder="Токен Telegram-бота (от @BotFather)">
+        <input class="tin" id="ad-max" placeholder="Токен Max-бота (необязательно)">
+        <input class="tin" id="ad-maxbot" placeholder="Имя Max-бота (если нужно)">
+        <button class="buy ok" style="width:100%" onclick="adminSave()">Активировать ботов</button>
+        <div class="prov" style="margin-top:8px"><button class="buy alt" onclick="getSrv(0)">Команда запуска</button><button class="buy alt" onclick="getSrv(1)">Скачать server.js</button></div>
+        <div class="note">Один раз запустите сервер командой (кнопка копирует её) из папки с этим файлом, затем введите токен здесь — бот включится сам.</div></div>
+      <div class="set"><label>Качество графики</label>
+        <select id="gfx" onchange="applySettings(true)"><option value="high">Ультра-Хомяк (эффекты, блюр)</option><option value="low">Экономный Картофель (для FPS)</option></select></div>
+      <div class="set"><label>Громкость тапов</label><input type="range" id="vol" min="0" max="100" value="70" oninput="applySettings(true)"></div>
+      <div class="set"><label>Фоновая музыка</label>
+        <select id="mus" onchange="applySettings(true)"><option value="off">Выключена</option><option value="on">Весёлый бит (синтезатор)</option></select></div>
+      <div class="box">
+        <p><b>Версия:</b> 0.4 Alpha</p>
+        <p>Если вы заметили баг или хотите поддержать проект — пишите мне:</p>
+        <p>📧 <a class="mail" href="mailto:Silovaleksandr329@gmail.com">Silovaleksandr329@gmail.com</a></p>
+      </div>
+      <div class="set" style="margin-top:16px"><button class="buy danger" style="width:100%" onclick="resetGame()">Сбросить прогресс</button></div>
+    </div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<script>
+/* ===== Данные ===== */
+const UPGRADES=[
+ {id:'finger',name:'Тренировка пальцев',desc:'+1 к силе тапа',base:50,mult:1.55,tap:1},
+ {id:'seed',name:'Золотая семечка',desc:'+4 к силе тапа',base:400,mult:1.6,tap:4},
+ {id:'drink',name:'Энергетик Хомяка',desc:'+20 к силе тапа',base:3000,mult:1.65,tap:20},
+ {id:'squirrel',name:'Авто-кликер «Белка»',desc:'+2 монеты/с',base:200,mult:1.5,pas:2},
+ {id:'farm',name:'Хомячья ферма',desc:'+12 монет/с',base:1800,mult:1.55,pas:12},
+ {id:'factory',name:'Семечковый завод',desc:'+60 монет/с',base:12000,mult:1.6,pas:60},
+ {id:'gym',name:'Хомяк-качок',desc:'+100 к силе тапа',base:25000,mult:1.7,tap:100},
+ {id:'wheel',name:'Мега-колесо',desc:'+300 монет/с',base:60000,mult:1.6,pas:300},
+ {id:'crypto',name:'Крипто-ферма',desc:'+1 500 монет/с',base:300000,mult:1.65,pas:1500},
+ {id:'lab',name:'Секретная лаборатория',desc:'+8 000 монет/с',base:2000000,mult:1.7,pas:8000}
+];
+// Чтобы поставить свою AI-картинку: добавьте поле photo:'skins/ninja.png' (скин) или photo:'bg/space.jpg' (фон)
+const SKINS=[
+ {id:'default',name:'Обычный хомяк',cost:0,e:'🐹',c:'#e9a55d'},{id:'ninja',name:'Хомяк-ниндзя',cost:500,e:'🥷',c:'#4a4f5c'},
+ {id:'king',name:'Король хомяков',cost:2500,e:'🤴',c:'#ffc400'},{id:'robot',name:'Кибер-Хома 3000',cost:8000,e:'🤖',c:'#9aa6b5'},
+ {id:'alien',name:'Инопланетянин',cost:25000,e:'👽',c:'#7be07b'},
+ {id:'pirate',name:'Хомяк-пират',cost:4000,e:'🏴‍☠️',c:'#c98b4e'},{id:'astro',name:'Космонавт',cost:15000,e:'🧑‍🚀',c:'#eef2f7'},
+ {id:'wizard',name:'Хомяк-волшебник',cost:40000,e:'🧙',c:'#5b2ea6'},{id:'gold',name:'Золотой хомяк',cost:120000,e:'👑',c:'#ffd000'}
+];
+const BGS=[
+ {id:'default',name:'Уютная клетка',cost:0,fx:'default',s:'radial-gradient(circle at 50% 35%,#4a3b2c,#120d09)'},
+ {id:'matrix',name:'Код Матрицы',cost:300,fx:'matrix',s:'radial-gradient(circle,#06180b,#000)'},
+ {id:'neon',name:'Неон-синтвейв',cost:1500,fx:'neon',s:'linear-gradient(#1a0b3d 0%,#4a0f6b 52%,#12002b 52%)'},
+ {id:'space',name:'Космический полёт',cost:5000,fx:'space',s:'radial-gradient(circle at 50% 40%,#1b1740,#06040a)'},
+ {id:'forest',name:'Тёплый лес',cost:800,fx:'forest',s:'linear-gradient(#0f2a1a,#2f4a22 60%,#1a2410)'},
+ {id:'ocean',name:'Подводный мир',cost:3500,fx:'ocean',s:'linear-gradient(#0a4a7a,#04182e)'},
+ {id:'snow',name:'Снежная зима',cost:9000,fx:'snow',s:'linear-gradient(#27406b,#0c1630)'},
+ {id:'gold',name:'Сокровищница',cost:50000,fx:'gold',s:'radial-gradient(circle at 50% 40%,#6b4a00,#1a1000)'}
+];
+const MAIL='Silovaleksandr329@gmail.com';
+const KEY='hamster_combat_v3';
+const fresh=()=>({coins:0,total:0,levels:{},skin:'default',bg:'default',skins:['default'],bgs:['default'],reg:0,dl:'',st:0,last:Date.now(),set:{gfx:'high',vol:70,mus:'off'}});
+let S=fresh(), user=null, dirty=false, lastSync=0;
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>{n=Math.floor(n);if(n<1e4)return n.toLocaleString('ru');const u=['','K','M','B','T'];let i=0,v=n;while(v>=1000&&i<u.length-1){v/=1000;i++}return v.toFixed(v<100?2:1).replace(/\.?0+$/,'')+u[i]};
+const lvl=id=>S.levels[id]||0;
+const cost=u=>Math.floor(u.base*Math.pow(u.mult,lvl(u.id)));
+const tapPower=()=>1+UPGRADES.reduce((a,u)=>a+(u.tap||0)*lvl(u.id),0);
+const passive=()=>UPGRADES.reduce((a,u)=>a+(u.pas||0)*lvl(u.id),0);
+
+/* ===== Сохранение ===== */
+function load(){try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(fresh(),JSON.parse(r));}catch(e){}}
+function save(){S.last=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2600)}
+
+/* ===== UI ===== */
+function updateTop(){$('bal').textContent=fmt(S.coins);$('cp').textContent='+'+fmt(tapPower());$('pi').textContent='+'+fmt(passive())+'/с'}
+function renderUp(){
+ $('l-up').innerHTML=UPGRADES.map(u=>`<div class="item"><div><h4>${u.name} <small style="opacity:.6">ур. ${lvl(u.id)}</small></h4><p>${u.desc}</p></div>
+ <button class="buy" ${S.coins>=cost(u)?'':'disabled'} onclick="buyUp('${u.id}')">🪙 ${fmt(cost(u))}</button></div>`).join('');
+}
+function renderSkins(){
+ $('l-skin').innerHTML=SKINS.map(k=>{const own=S.skins.includes(k.id),on=S.skin===k.id;
+  const b=on?'<button class="buy ok" disabled>Надет</button>':own?`<button class="buy alt" onclick="equip('skin','${k.id}')">Надеть</button>`:`<button class="buy" ${S.coins>=k.cost?'':'disabled'} onclick="buy('skin','${k.id}')">🪙 ${fmt(k.cost)}</button>`;
+  return `<div class="item ${on?'on':''}"><div class="row"><span class="em" style="width:40px;height:40px;border-radius:50%;display:inline-block;background:radial-gradient(circle at 35% 30%,#fff9,${k.c})"></span><div><h4>${k.name}</h4></div></div>${b}</div>`}).join('');
+}
+function renderBgs(){
+ $('l-bg').innerHTML=BGS.map(k=>{const own=S.bgs.includes(k.id),on=S.bg===k.id;
+  const b=on?'<button class="buy ok" disabled>Активен</button>':own?`<button class="buy alt" onclick="equip('bg','${k.id}')">Выбрать</button>`:`<button class="buy" ${S.coins>=k.cost?'':'disabled'} onclick="buy('bg','${k.id}')">🪙 ${fmt(k.cost)}</button>`;
+  return `<div class="item ${on?'on':''}"><div class="row"><span class="em" style="width:36px;height:36px;border-radius:10px;background:${k.s};display:inline-block"></span><div><h4>${k.name}</h4></div></div>${b}</div>`}).join('');
+}
+let openId=null;
+function renderOpen(){if(openId==='m-daily')renderDaily();else if(openId==='m-up')renderUp();else if(openId==='m-skin')renderSkins();else if(openId==='m-bg')renderBgs()}
+function openModal(id){closeModals();openId=id;sfx('open');$(id).classList.add('active');renderOpen();if(id==='m-top')loadBoard();if(id==='m-set')renderAuth()}
+function closeModals(){openId=null;document.querySelectorAll('.modal').forEach(m=>m.classList.remove('active'))}
+function applyLook(){
+ const sk=SKINS.find(x=>x.id===S.skin)||SKINS[0],ph=$('ph'),fb=$('fb'),has3d=!!window.H3D&&!sk.photo;
+ $('c3d').style.display=has3d?'block':'none';
+ ph.style.display=sk.photo?'block':'none';if(sk.photo)ph.src=sk.photo;
+ fb.style.display=(!has3d&&!sk.photo)?'flex':'none';fb.textContent=sk.e;
+ if(window.H3D)H3D.setSkin(S.skin);
+ setFx(S.bg);
+}
+
+/* ===== Покупки ===== */
+function buyUp(id){const u=UPGRADES.find(x=>x.id===id);const c=cost(u);if(S.coins<c)return;S.coins-=c;S.levels[id]=lvl(id)+1;sfx('buy');dirty=true;updateTop();renderOpen();save()}
+function buy(type,id){const list=type==='skin'?SKINS:BGS,arr=type==='skin'?S.skins:S.bgs,it=list.find(x=>x.id===id);
+ if(!it||arr.includes(id)||S.coins<it.cost)return;S.coins-=it.cost;arr.push(id);sfx('buy');equip(type,id)}
+function equip(type,id){if(type==='skin')S.skin=id;else S.bg=id;sfx('equip');applyLook();updateTop();renderOpen();save();dirty=true}
+
+/* ===== Клик ===== */
+const hm=$('hamster');
+hm.addEventListener('pointerdown',e=>{
+ e.preventDefault();wake();
+ const cr=Math.random()<.07,p=tapPower()*(cr?5:1);S.coins+=p;S.total+=p;dirty=true;
+ $('bal').textContent=fmt(S.coins);
+ hm.classList.add('hit');setTimeout(()=>hm.classList.remove('hit'),70);
+ cr?sfx('crit'):tapSound();window.H3D&&H3D.tap();float(e.clientX,e.clientY,cr?'КРИТ! +'+fmt(p):'+'+fmt(p));
+});
+function float(x,y,t){
+ const g=$('game'),r=g.getBoundingClientRect(),el=document.createElement('div');el.className='float';el.textContent=t;
+ el.style.left=(x-r.left-15)+'px';el.style.top=(y-r.top-20)+'px';
+ if(Math.random()<.12){const ph=['ХОМЯК КРАШ!','ТАПАЙ ЕЩЁ!','МАЙНИНГ!','PUMP!','ЛИСТИНГ СКОРО!'];el.textContent=ph[Math.random()*ph.length|0];el.style.color='#54a0ff';el.style.fontSize='1.2rem'}
+ g.appendChild(el);setTimeout(()=>el.remove(),700);
+}
+
+/* ===== Звук (Web Audio: реверб, компрессор, шум-«хруст», секвенсор) ===== */
+let ac=null,master=null,verb=null,mi=null;
+function wake(){try{
+ if(!ac){ac=new(window.AudioContext||window.webkitAudioContext)();const comp=ac.createDynamicsCompressor();master=ac.createGain();master.connect(comp);comp.connect(ac.destination);
+  const len=ac.sampleRate*1.4,buf=ac.createBuffer(2,len,ac.sampleRate);
+  for(let c=0;c<2;c++){const d=buf.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3)}
+  verb=ac.createConvolver();verb.buffer=buf;const vg=ac.createGain();vg.gain.value=.3;verb.connect(vg);vg.connect(master)}
+ if(ac.state==='suspended')ac.resume()}catch(e){}}
+document.addEventListener('pointerdown',wake);
+function tone(f,t0,dur,o={}){if(!ac)return;const{type='sine',vol=.2,to=0,wet=0,att=.005}=o;
+ const os=ac.createOscillator(),g=ac.createGain();os.type=type;os.frequency.setValueAtTime(f,t0);if(to)os.frequency.exponentialRampToValueAtTime(to,t0+dur);
+ g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(Math.max(vol,.0002),t0+att);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+ os.connect(g);g.connect(master);if(wet){const w=ac.createGain();w.gain.value=wet;g.connect(w);w.connect(verb)}os.start(t0);os.stop(t0+dur+.05)}
+function noise(t0,dur,o={}){if(!ac)return;const{vol=.3,freq=3000,q=1,type='bandpass'}=o;
+ const n=Math.floor(ac.sampleRate*dur),bf=ac.createBuffer(1,n,ac.sampleRate),d=bf.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+ const src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=bf;f.type=type;f.frequency.value=freq;f.Q.value=q;
+ g.gain.setValueAtTime(vol,t0);g.gain.exponentialRampToValueAtTime(.0001,t0+dur);src.connect(f);f.connect(g);g.connect(master);src.start(t0)}
+function tapSound(){const v=S.set.vol/100;if(!ac||v<=0)return;const t=ac.currentTime,p=1+Math.random()*.3,k=S.skin;
+ if(k==='robot'){tone(880*p,t,.09,{type:'square',vol:.12*v,to:440*p});noise(t,.03,{vol:.2*v,freq:5000,type:'highpass'});return}
+ if(k==='alien'){tone(300*p,t,.25,{vol:.28*v,to:900*p,wet:.3});tone(305*p,t,.25,{vol:.2*v,to:910*p});return}
+ if(k==='wizard'||k==='astro'){tone(1200*p,t,.18,{type:'triangle',vol:.18*v,to:2400*p,wet:.5});tone(1800*p,t+.05,.2,{vol:.08*v,wet:.5});return}
+ if(k==='gold'){tone(1568*p,t,.3,{vol:.15*v,wet:.4});tone(2093*p,t+.04,.3,{vol:.1*v,wet:.4});noise(t,.04,{vol:.3*v,freq:7000,type:'highpass'});return}
+ if(k==='pirate'){tone(120*p,t,.2,{type:'sawtooth',vol:.25*v,to:60});noise(t,.08,{vol:.4*v,freq:900,q:.8});return}
+ noise(t,.06,{vol:.55*v,freq:2200+Math.random()*1800,q:.9});
+ tone(430*p,t,.14,{vol:.4*v,to:150*p,wet:.1});
+ tone(980*p,t,.07,{type:'triangle',vol:.12*v,to:520})}
+function sfx(k){const v=S.set.vol/100;if(!ac||v<=0)return;const t=ac.currentTime,A=(fs,gap,d,o)=>fs.forEach((f,i)=>tone(f,t+i*gap,d,o));
+ if(k==='buy'){A([988,1319,1760],.07,.35,{vol:.2*v,wet:.35});noise(t,.05,{vol:.2*v,freq:6000,type:'highpass'})}
+ else if(k==='daily'){A([523,659,784,1047,1319,1568],.09,.5,{type:'triangle',vol:.2*v,wet:.45});noise(t+.5,.25,{vol:.12*v,freq:7000,type:'highpass'})}
+ else if(k==='login'){A([392,523,659,784],.08,.3,{type:'triangle',vol:.18*v,wet:.4})}
+ else if(k==='crit'){tone(1400,t,.25,{vol:.25*v,to:2800,wet:.4});tone(2100,t+.06,.3,{vol:.15*v,wet:.4});noise(t,.1,{vol:.35*v,freq:5000,q:.6})}
+ else if(k==='error'){tone(160,t,.22,{type:'sawtooth',vol:.15*v,to:90});tone(150,t+.12,.22,{type:'sawtooth',vol:.15*v,to:80})}
+ else if(k==='open'){tone(500,t,.06,{type:'triangle',vol:.1*v,to:800})}
+ else{tone(660,t,.12,{type:'triangle',vol:.14*v,wet:.2});tone(880,t+.07,.18,{type:'triangle',vol:.14*v,wet:.2})}}
+const CH=[[261.63,329.63,392],[196,246.94,293.66],[220,261.63,329.63],[174.61,220,261.63]],BASS=[65.41,49,55,43.65],MEL=[0,1,2,1,2,1,0,1];
+function sched(s,t){const mv=S.set.vol/100;if(mv<=0)return;const bar=(s>>3)&3,st=s&7,ch=CH[bar];
+ if(st%2===0)tone(BASS[bar],t,.42,{type:'triangle',vol:.2*mv});
+ tone(ch[MEL[st]]*2,t,.4,{vol:.08*mv,wet:.35});
+ if(st===0||st===5)tone(ch[2]*4,t,.3,{type:'triangle',vol:.05*mv,wet:.4});
+ if(st%2===1)noise(t,.04,{vol:.05*mv,freq:8000,type:'highpass'});
+ if(st===0||st===4)noise(t,.09,{vol:.12*mv,freq:180,q:.7,type:'lowpass'})}
+function setMusic(on){
+ if(on&&!mi){wake();if(!ac)return;let step=0,next=ac.currentTime+.1;mi=setInterval(()=>{while(next<ac.currentTime+.3){sched(step++,next);next+=.25}},100)}
+ else if(!on&&mi){clearInterval(mi);mi=null}}
+
+/* ===== Настройки ===== */
+function applySettings(fromUI){
+ if(fromUI){S.set.gfx=$('gfx').value;S.set.vol=+$('vol').value;S.set.mus=$('mus').value;save()}
+ else{$('gfx').value=S.set.gfx;$('vol').value=S.set.vol;$('mus').value=S.set.mus}
+ document.body.classList.toggle('low',S.set.gfx==='low');
+ setMusic(S.set.mus==='on');fxResize();
+}
+function resetGame(){
+ if(!confirm('Точно сбросить весь прогресс на этом устройстве? Облачное сохранение тоже будет перезаписано.'))return;
+ const s=S.set;S=fresh();S.set=s;dirty=true;save();applyLook();updateTop();renderOpen();toast('Прогресс сброшен');pushCloud(true)
+}
+
+/* ===== Ежедневный бонус ===== */
+const DAILY=[300,600,1000,1800,3000,5000,12000],REG_BONUS=5000;
+const dkey=(d=new Date())=>d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+function dailyInfo(){if(S.dl===dkey())return{can:false,idx:S.st%7};const ok=S.dl===dkey(new Date(Date.now()-864e5));return{can:true,idx:ok?S.st%7:0,ok}}
+function claimDaily(){const i=dailyInfo();if(!i.can)return;if(!i.ok)S.st=0;const g=DAILY[i.idx];S.coins+=g;S.total+=g;S.st++;S.dl=dkey();sfx('daily');dirty=true;updateTop();renderOpen();save();toast('🎁 +'+fmt(g)+' 🪙')}
+function renderDaily(){const i=dailyInfo(),done=i.can?i.idx:(S.st-1)%7+1;
+ $('l-daily').innerHTML=`<div class="note">Заходите каждый день — награда растёт. Пропустите день, и серия начнётся заново.</div><div class="dg">`+
+ DAILY.map((g,k)=>`<div class="dt ${k<done?'got':''} ${i.can&&k===i.idx?'now':''} ${k===6?'big':''}">${k===6?'🎁 ':''}День ${k+1}<b>${k<done?'✅':'🪙 '+fmt(g)}</b></div>`).join('')+`</div>`+
+ (i.can?`<button class="buy ok" style="width:100%" onclick="claimDaily()">Забрать 🪙 ${fmt(DAILY[i.idx])}</button>`:`<button class="buy" style="width:100%" disabled>Следующая награда завтра</button>`)+
+ (user?'':`<div class="box"><p>🎉 За регистрацию через бота — <b>🪙 ${fmt(REG_BONUS)}</b> один раз.</p><button class="buy alt" style="width:100%" onclick="closeModals();openModal('m-set')">Зарегистрироваться</button></div>`)}
+
+/* ===== Аккаунт через бота (Telegram / Max) ===== */
+const API_URL='';   // пусто = тот же сервер, откуда открыта игра; иначе 'https://ваш-сервер.ru'
+const cloudReady=()=>!!API_URL||/^https?:/.test(location.protocol);
+let AUTH={key:localStorage.getItem('hc_key')||'',step:0,prov:'tg',tok:'',link:''};
+async function api(p,body){const r=await fetch(API_URL+'/api/'+p,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Key':AUTH.key},body:body&&JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
+window.cloud={ready:true,getMe:async()=>(await api('me')).data,setMe:(u,d)=>api('save',d),top:async n=>(await api('top?n='+n)).rows};
+const PN={tg:'Telegram',max:'Max'};
+function authHtml(){
+ if(!cloudReady())return `<div class="note">☁️ Откройте игру через сервер (см. server.js): тогда заработают вход через бота и общая таблица лидеров. Локально игра работает как раньше.</div>`;
+ if(user)return `<div class="row" style="gap:10px;margin-bottom:8px"><div style="flex:1;overflow:hidden"><b>${esc(user.name)}</b><div class="note" style="margin:0">Прогресс сохраняется в облаке (${PN[user.prov]||'бот'})</div></div></div><button class="buy alt" style="width:100%" onclick="doSignOut()">Выйти</button>`;
+ if(AUTH.step===1)return `<div class="note">1) Нажмите «Открыть» и в боте — «Запустить».<br>2) Бот пришлёт 6-значный код.<br>3) Введите код здесь.</div><a class="buy alt" style="display:block;text-align:center;text-decoration:none" href="${esc(AUTH.link)}" target="_blank" rel="noopener">Открыть ${PN[AUTH.prov]}</a><input class="codein" inputmode="numeric" maxlength="6" placeholder="••••••"><button class="buy ok" style="width:100%" onclick="doVerify()">Подтвердить</button><button class="mini-btn" style="margin-top:8px" onclick="AUTH.step=0;renderAuth()">Назад</button>`;
+ return `<div class="prov"><button class="buy alt" onclick="startLogin('tg')">✈️ Telegram</button><button class="buy alt" onclick="startLogin('max')">💬 Max</button></div><div class="note">Войдите, чтобы сохранить прогресс в облаке, попасть в таблицу лидеров и получить 🪙 ${fmt(REG_BONUS)} за регистрацию.</div>`}
+function renderAuth(){
+ $('set-auth').innerHTML=authHtml();$('lb-auth').innerHTML=user?'':authHtml();
+ $('who').textContent=user?('👤 '+user.name):'Гость (прогресс только на этом устройстве)';
+ $('hdrAuth').style.display=user?'none':''}
+function doSignIn(){openModal('m-set')}
+const LAUNCH='node -e "eval(require(\'fs\').readFileSync(\'hamster_combat.html\',\'utf8\').split(\'<'+'script type=text/plain id=srv>\')[1].split(\'<'+'/script>\')[0])"';
+function getSrv(dl){const cp=t=>(navigator.clipboard?navigator.clipboard.writeText(t).then(()=>toast('Скопировано')):Promise.reject()).catch(()=>toast('Не удалось скопировать'));
+ if(!dl)return cp(LAUNCH);const t=$('srv').textContent,a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/javascript'}));a.download='server.js';a.click()}
+async function adminSave(){const g=i=>$(i).value.trim(),out=[];
+ try{for(const[p,t,b]of[['tg',g('ad-tg'),''],['max',g('ad-max'),g('ad-maxbot')]])if(t){const j=await api('admin',{pass:g('ad-pass'),prov:p,token:t,bot:b});out.push(PN[p]+' @'+j.bot)}
+  toast(out.length?'✅ Боты активны: '+out.join(', '):'Введите токен');sfx(out.length?'login':'error')}catch(e){sfx('error');toast('Ошибка: '+e.message)}}
+async function startLogin(p){try{const j=await api('start',{prov:p});AUTH.step=1;AUTH.prov=p;AUTH.tok=j.token;AUTH.link=j.link;renderAuth()}catch(e){sfx('error');toast('Сервер недоступен: '+e.message)}}
+async function doVerify(){
+ const code=[...document.querySelectorAll('.codein')].map(e=>e.value.trim()).find(Boolean)||'';if(code.length!==6)return toast('Введите 6 цифр из бота');
+ try{const j=await api('verify',{token:AUTH.tok,code});AUTH.key=j.key;AUTH.step=0;localStorage.setItem('hc_key',j.key);
+  if(j.isNew&&!S.reg){S.reg=1;S.coins+=REG_BONUS;S.total+=REG_BONUS;updateTop();toast('🎉 Бонус за регистрацию: +'+fmt(REG_BONUS)+' 🪙')}else toast('✅ Вы вошли');
+  sfx('login');await onUser({uid:j.uid,name:j.name,prov:j.prov})}catch(e){sfx('error');toast('Ошибка: '+e.message)}}
+function doSignOut(){AUTH.key='';localStorage.removeItem('hc_key');user=null;renderAuth();toast('Вы вышли')}
+async function onUser(u){
+ user={uid:u.uid,name:u.name||'Игрок',photo:'',prov:u.prov};renderAuth();
+ try{
+  const d=await window.cloud.getMe(u.uid);
+  if(d&&d.save){const c=JSON.parse(d.save);
+   if((c.total||0)>S.total){const s=S.set;S=Object.assign(fresh(),c);S.set=s;applyLook();updateTop();renderOpen();save();toast('☁️ Загружен прогресс из облака')}
+   else await pushCloud(true)}
+  else await pushCloud(true);
+ }catch(e){toast('Ошибка синхронизации')}
+}
+async function pushCloud(force){
+ if(!user||!cloudReady())return;
+ if(!force&&!dirty)return;
+ if(!force&&Date.now()-lastSync<20000)return;
+ lastSync=Date.now();dirty=false;
+ try{await window.cloud.setMe(user.uid,{name:user.name,score:Math.floor(S.total),save:JSON.stringify(S)})}catch(e){dirty=true}
+}
+async function loadBoard(){
+ const box=$('lb-list');renderAuth();
+ if(!cloudReady()){box.innerHTML='<div class="note">Таблица лидеров появится после запуска сервера.</div>';return}
+ box.innerHTML='<div class="note">Загрузка…</div>';
+ try{
+  if(user)await pushCloud(true);
+  const rows=await window.cloud.top(50);
+  box.innerHTML=rows.length?rows.map((r,i)=>`<div class="lb ${user&&r.id===user.uid?'me':''}"><div class="n">${i<3?['🥇','🥈','🥉'][i]:i+1}</div><span>${r.prov==='max'?'💬':'✈️'}</span><div class="nm">${esc(r.name)}</div><div class="sc">${fmt(r.score)}</div></div>`).join(''):'<div class="note">Пока никого нет. Будьте первым!</div>';
+ }catch(e){box.innerHTML='<div class="note">Не удалось загрузить таблицу. Проверьте, что сервер запущен.</div>'}
+}
+
+/* ===== Анимированные фоны (canvas) ===== */
+const fx=$('fx'),fc=fx.getContext('2d');let fxType='default',fw=1,fh=1,fd=1,P=[],fo=0;
+const PC={default:{c:'rgba(255,210,140,.35)',d:-1},forest:{c:'rgba(190,255,120,.55)',d:-1,sp:.7},ocean:{c:'rgba(170,230,255,.45)',d:-1,sp:1.6,k:1.8},snow:{c:'rgba(255,255,255,.85)',d:1,sp:1.8,k:1.2},gold:{c:'rgba(255,215,0,.55)',d:-1,sp:1.2}};
+const KANA='ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ0123456789';
+const isLow=()=>document.body.classList.contains('low');
+function fxResize(){const r=$('game').getBoundingClientRect();fd=Math.min(devicePixelRatio||1,isLow()?1:2);fx.width=Math.max(1,r.width*fd);fx.height=Math.max(1,r.height*fd);fw=fx.width;fh=fx.height;fxInit()}
+function fxInit(){P=[];const low=isLow();
+ if(PC[fxType])for(let i=0;i<(low?18:50);i++)P.push({x:Math.random()*fw,y:Math.random()*fh,r:(1+Math.random()*3)*fd,v:(.15+Math.random()*.4)*fd,a:Math.random()*6});
+ else if(fxType==='matrix'){const n=Math.floor(fw/(16*fd));for(let i=0;i<n;i++)P.push({y:Math.random()*fh/(16*fd),v:.25+Math.random()*.4,l:-1})}
+ else if(fxType==='space')for(let i=0;i<(low?60:160);i++)P.push({x:(Math.random()-.5)*2,y:(Math.random()-.5)*2,z:Math.random()});
+ fc.clearRect(0,0,fw,fh)}
+function setFx(id){const b=BGS.find(x=>x.id===id)||BGS[0];
+ $('game').style.background=b.photo?`url(${b.photo}) center/cover`:b.s;
+ fxType=b.photo?'none':b.fx;fxInit()}
+function fxFrame(){requestAnimationFrame(fxFrame);if(document.hidden)return;fo+=.016;
+ if(fxType==='matrix'){fc.globalCompositeOperation='destination-out';fc.fillStyle='rgba(0,0,0,.05)';fc.fillRect(0,0,fw,fh);fc.globalCompositeOperation='source-over';
+  const z=16*fd;fc.font=z+'px monospace';
+  P.forEach((c,i)=>{c.y+=c.v;const row=Math.floor(c.y);if(row!==c.l){c.l=row;fc.fillStyle='rgba(130,255,160,.95)';fc.fillText(KANA[Math.random()*KANA.length|0],i*z,row*z)}if(row*z>fh&&Math.random()>.97){c.y=0;c.l=-1}});return}
+ fc.clearRect(0,0,fw,fh);
+ if(PC[fxType]){const c=PC[fxType];P.forEach(p=>{p.y+=c.d*p.v*(c.sp||1);p.x+=Math.sin(fo+p.a)*.3*fd;if(p.y<-10)p.y=fh+10;if(p.y>fh+10)p.y=-10;fc.fillStyle=c.c;fc.beginPath();fc.arc(p.x,p.y,p.r*(c.k||1),0,7);fc.fill()})}
+ else if(fxType==='space')P.forEach(st=>{st.z-=.004;if(st.z<=.01){st.x=(Math.random()-.5)*2;st.y=(Math.random()-.5)*2;st.z=1}
+  const k=.25/st.z,x=fw/2+st.x*k*fw/2,y=fh/2+st.y*k*fh/2,r=Math.max(.6,(1-st.z)*2.8)*fd;fc.fillStyle=`rgba(255,255,255,${Math.min(1,1.2-st.z)})`;fc.fillRect(x,y,r,r)});
+ else if(fxType==='neon'){const hz=fh*.52,R=fw*.28,g=fc.createLinearGradient(0,hz-R,0,hz);g.addColorStop(0,'#ffe066');g.addColorStop(1,'#ff2e93');
+  fc.save();fc.beginPath();fc.rect(0,0,fw,hz);fc.clip();fc.fillStyle=g;fc.beginPath();fc.arc(fw/2,hz,R,0,7);fc.fill();
+  fc.fillStyle='rgba(26,11,61,.95)';for(let i=1;i<6;i++)fc.fillRect(fw/2-R,hz-i*R*.16,R*2,i*1.3*fd);fc.restore();
+  fc.strokeStyle='rgba(255,70,220,.8)';fc.lineWidth=1.5*fd;fc.shadowColor='#ff46dc';fc.shadowBlur=isLow()?0:8*fd;fc.beginPath();
+  for(let i=-12;i<=12;i++){fc.moveTo(fw/2,hz);fc.lineTo(fw/2+i*fw*.4,fh)}
+  const off=(fo*.4)%1;for(let k=0;k<10;k++){const t=(k+off)/10,y=hz+(fh-hz)*t*t;fc.moveTo(0,y);fc.lineTo(fw,y)}
+  fc.stroke();fc.shadowBlur=0}}
+window.addEventListener('resize',fxResize);fxFrame();
+
+/* ===== Цикл ===== */
+setInterval(()=>{const p=passive();if(p>0){S.coins+=p;S.total+=p;dirty=true;updateTop();}renderOpen()},1000);
+setInterval(()=>{save();pushCloud(false)},5000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){save();pushCloud(true)}});
+window.addEventListener('pagehide',save);
+
+/* ===== Старт ===== */
+window.addEventListener('DOMContentLoaded',()=>{
+ load();
+ // оффлайн-доход: до 2 часов
+ const away=Math.min((Date.now()-(S.last||Date.now()))/1000,7200),p=passive();
+ if(p>0&&away>30){const g=Math.floor(away*p);S.coins+=g;S.total+=g;setTimeout(()=>toast('Пока вас не было: +'+fmt(g)+' 🪙'),900)}
+ applyLook();applySettings(false);updateTop();renderAuth();
+ if(AUTH.key&&cloudReady())api('me').then(j=>onUser({uid:j.uid,name:j.name,prov:j.prov})).catch(()=>{});
+ setTimeout(()=>{if(dailyInfo().can)openModal('m-daily')},2400);
+ let pr=0;const t0=Date.now();const iv=setInterval(()=>{const wait=!window.h3dState&&Date.now()-t0<7000;pr+=Math.random()*6+2;const cap=wait?92:100;if(pr>=cap)pr=cap;if(pr>=100){clearInterval(iv);setTimeout(()=>{$('loader').style.opacity=0;setTimeout(()=>$('loader').style.display='none',600)},300)}$('lf').style.width=pr+'%'},80);
+});
+</script>
+
+<script type="module">
+/* ===== 3D-хомяк на Three.js (собран из примитивов, без внешних моделей) ===== */
+try{
+const THREE=await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
+const cv=document.getElementById('c3d'),wrap=document.getElementById('hamster');
+const ren=new THREE.WebGLRenderer({canvas:cv,alpha:true,antialias:true});ren.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(35,1,.1,60);cam.position.set(0,.9,10.5);cam.lookAt(0,-.1,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x7a6a5a,1.0));
+const key=new THREE.DirectionalLight(0xfff1de,2.2);key.position.set(3,6,7);scene.add(key);
+const rim=new THREE.DirectionalLight(0x6fd0ff,1.3);rim.position.set(-6,3,-5);scene.add(rim);
+const shadow=new THREE.Mesh(new THREE.CircleGeometry(1.9,32),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.35}));
+shadow.rotation.x=-Math.PI/2;shadow.position.y=-2.55;shadow.scale.set(1.25,1,1);scene.add(shadow);
+const SK={default:{fur:0xe9a55d,belly:0xfff0d6,acc:0xffa6b5},
+ ninja:{fur:0x3a3f4d,belly:0x3a3f4d,acc:0xff6b81,suit:0x161a24},
+ king:{fur:0xd98a3d,belly:0xfff0d6,acc:0xffa6b5,suit:0xb3122e},
+ robot:{fur:0x8fa0b4,belly:0xdfe6ee,acc:0x00e5ff,metal:1},
+ alien:{fur:0x6fdc6f,belly:0xcaffca,acc:0xff7bd5},
+ pirate:{fur:0xc98b4e,belly:0xfff0d6,acc:0xffa6b5,suit:0xf4f1ea},
+ astro:{fur:0xf1d9b8,belly:0xfff0d6,acc:0xffa6b5,suit:0xeef2f7},
+ wizard:{fur:0xe9a55d,belly:0xfff0d6,acc:0xffa6b5,suit:0x5b2ea6},
+ gold:{fur:0xffc400,belly:0xfff1a8,acc:0xffe58a,metal:1}};
+const M=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.72,metalness:0,...o});
+function build(id){
+ const k=SK[id]||SK.default,g=new THREE.Group(),mt=k.metal?{roughness:.3,metalness:.75}:{};
+ const fur=M(k.fur,mt),bel=M(k.belly,k.metal?{roughness:.35,metalness:.4}:{}),pink=M(k.acc),blk=M(0x111111,{roughness:.2}),wht=M(0xffffff,{roughness:.3}),suit=k.suit?M(k.suit,{roughness:.85}):null;
+ const glow=(c,i=2)=>M(c,{emissive:c,emissiveIntensity:i});
+ const sp=(r,m,x,y,z,sx=1,sy=1,sz=1)=>{const s=new THREE.Mesh(new THREE.SphereGeometry(r,32,24),m);s.position.set(x,y,z);s.scale.set(sx,sy,sz);g.add(s);return s};
+ const mesh=(geo,m,x,y,z,rx=0,rz=0)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.rotation.set(rx,0,rz);g.add(o);return o};
+ if(id==='gold'){fur.emissive.set(0x6b4a00);bel.emissive.set(0x6b4a00)}
+ sp(1.5,fur,0,-.9,0,1.05,1,.95);
+ if(suit)sp(1.5,suit,0,-.9,0,1.12,1.05,1.02);else sp(1.15,bel,0,-1,.78,.9,.95,.72); // живот теперь выступает из тела
+ sp(1.35,fur,0,.9,.1,1.15,1,1);
+ sp(.62,bel,-.95,.5,.85,1,.9,.8);sp(.62,bel,.95,.5,.85,1,.9,.8);
+ for(const x of[-1,1]){sp(.4,fur,x*.95,2,0,1,1,.55);sp(.26,pink,x*.95,2,.17,1,1,.4);sp(.3,fur,x,-.55,suit?1.3:.95,1,1.2,1);sp(.48,k.metal||!suit?bel:fur,x*.75,-2.05,.7,1,.6,1.25)}
+ sp(.13,pink,0,.78,1.43,1.3,1,1);
+ for(const x of[-1,1]){const t=new THREE.Mesh(new THREE.BoxGeometry(.15,.24,.06),wht);t.position.set(x*.08,.5,1.39);g.add(t)}
+ if(id==='robot'){
+  const v=new THREE.Mesh(new THREE.BoxGeometry(1.7,.42,.3),M(0x0a1a2a,{roughness:.2,metalness:.6}));v.position.set(0,1.15,1.42);g.add(v);
+  for(const x of[-1,1])sp(.14,glow(0x00e5ff),x*.45,1.15,1.58,1,1,.4);
+  mesh(new THREE.CylinderGeometry(.05,.05,.7),M(0x777777,{metalness:.8}),0,2.55,0);
+  sp(.14,glow(0xff3030,1.5),0,2.95,0);
+  mesh(new THREE.BoxGeometry(1.3,1.1,.25),M(0x56667a,{metalness:.8,roughness:.35}),0,-1,1.55);sp(.25,glow(0x00e5ff),0,-1,1.72,1,1,.5)}
+ else{const big=id==='alien';for(const x of[-1,1]){sp(big?.3:.17,blk,x*.55,1.15,1.28,1,big?1.4:1.15,.6);sp(.05,wht,x*.55+.06,1.15+(big?.18:.08),big?1.45:1.37)}}
+ if(id==='alien')for(const x of[-1,1]){const an=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.8),M(0x4fb04f));an.position.set(x*.5,2.45,0);an.rotation.z=-x*.3;g.add(an);sp(.15,glow(k.acc,.8),x*.64,2.85,0)}
+ if(id==='ninja'){
+  sp(1.3,suit,0,.3,.12,1.17,.48,1.02);
+  const hb=new THREE.Mesh(new THREE.TorusGeometry(1.2,.13,12,48),M(0xd63031,{roughness:.5}));hb.rotation.x=Math.PI/2;hb.scale.set(1.15,1,1);hb.position.set(0,1.55,.1);g.add(hb);
+  mesh(new THREE.BoxGeometry(.55,.3,.06),M(0xcfd6dd,{metalness:.9,roughness:.25}),0,1.55,1.31);
+  mesh(new THREE.BoxGeometry(.25,.8,.06),M(0xd63031),-.35,1.2,-1.3,0,.35)}
+ if(id==='king'){
+  const gold=M(0xffc400,{roughness:.25,metalness:.9,side:THREE.DoubleSide}),cr=new THREE.Group();
+  mesh(new THREE.TorusGeometry(1.25,.22,12,32),wht,0,-.2,.2,Math.PI/2);
+  for(const[y,z]of[[-.6,1.5],[-1.2,1.5],[-1.8,1.3]])sp(.1,gold,0,y,z);
+  cr.add(new THREE.Mesh(new THREE.CylinderGeometry(.78,.68,.4,24,1,true),gold));
+  for(let i=0;i<5;i++){const a=i/5*Math.PI*2,c=new THREE.Mesh(new THREE.ConeGeometry(.17,.45,8),gold);c.position.set(Math.sin(a)*.76,.4,Math.cos(a)*.76);cr.add(c);
+   const gm=new THREE.Mesh(new THREE.SphereGeometry(.08,12,12),glow(0xff2244,.8));gm.position.set(Math.sin(a)*.76,.66,Math.cos(a)*.76);cr.add(gm)}
+  cr.position.set(0,2.3,.1);cr.rotation.x=-.1;g.add(cr)}
+ if(id==='pirate'){
+  for(const[y,r]of[[-.5,1.7],[-1.1,1.75],[-1.7,1.52]])mesh(new THREE.TorusGeometry(r,.07,8,40),M(0x1d3557),0,y,0,Math.PI/2).scale.set(1,.88,1);
+  mesh(new THREE.BoxGeometry(.4,.3,.08),blk,-.55,1.15,1.42);
+  mesh(new THREE.CylinderGeometry(.9,1.25,.5,24),blk,0,2.3,.1,-.12);sp(.2,wht,0,2.35,1.05,1,1.1,.4)}
+ if(id==='astro'){
+  sp(1.85,M(0xa8dcff,{transparent:true,opacity:.2,roughness:.1,depthWrite:false}),0,.85,.1);
+  mesh(new THREE.BoxGeometry(.9,.7,.15),M(0xff7a1a),0,-1,1.55);sp(.12,glow(0x44ff88,1.5),.25,-.9,1.66)}
+ if(id==='wizard'){
+  mesh(new THREE.CylinderGeometry(1.45,1.45,.08,32),suit,0,2.15,.1);mesh(new THREE.ConeGeometry(.95,2,24),suit,0,3.1,.1);
+  sp(.18,glow(0xffd23f,1),0,2.8,.78);sp(.22,glow(0xffd23f,1),0,-1,1.5,1,1,.3)}
+ return g}
+const root=new THREE.Group();scene.add(root);let cur=build('default');root.add(cur);
+function fit(){const r=wrap.getBoundingClientRect();if(!r.width)return;ren.setPixelRatio(Math.min(devicePixelRatio||1,document.body.classList.contains('low')?1:2));ren.setSize(r.width,r.height,false);cam.aspect=r.width/r.height;cam.updateProjectionMatrix()}
+new ResizeObserver(fit).observe(wrap);fit();
+let last=performance.now(),squash=0,vel=0;const tgt={x:0,y:0};
+const aim=e=>{tgt.y=(e.clientX/innerWidth-.5)*.9;tgt.x=(e.clientY/innerHeight-.5)*.5};
+addEventListener('pointermove',aim);addEventListener('pointerdown',aim);
+function frame(now){requestAnimationFrame(frame);if(document.hidden||cv.style.display==='none'){last=now;return}
+ const dt=Math.min(.033,(now-last)/1000);last=now;const ts=now/1000;
+ vel+=(-160*squash-10*vel)*dt;squash+=vel*dt;tgt.x*=.985;tgt.y*=.985;
+ root.rotation.y+=((tgt.y+Math.sin(ts*.9)*.15)-root.rotation.y)*.12;root.rotation.x+=(tgt.x-root.rotation.x)*.12;
+ const sy=1-squash*.22;root.scale.set(1+squash*.16,sy,1+squash*.16);root.position.y=-2.4*(1-sy)+Math.sin(ts*2.2)*.08;
+ ren.render(scene,cam)}
+requestAnimationFrame(frame);
+window.H3D={setSkin(id){root.remove(cur);cur=build(id);root.add(cur)},tap(){squash=.8;vel=0}};
+window.h3dState='ok';if(typeof applyLook==='function')applyLook();
+}catch(e){console.error('3D недоступен, включён запасной режим',e);window.h3dState='fail';if(typeof applyLook==='function')applyLook()}
+</script>
+<script type=text/plain id=srv>
+// Сервер для Hamster Combat: вход через бота (Telegram / Max) с кодом, облачные сохранения, таблица лидеров.
+// Запускается прямо из hamster_combat.html (Node 18+, без установки пакетов). Токены ботов вводятся в игре: ⚙️ Опции → «Подключение ботов».
+// В консоли при старте печатается админ-код — он нужен, чтобы подключить ботов.
+const http = require('http'), fs = require('fs'), crypto = require('crypto');
+const PORT = process.env.PORT || 3000;
+const DB = 'db.json';
+let db = { users: {}, cfg: {} };
+try { db = JSON.parse(fs.readFileSync(DB, 'utf8')); } catch {}
+const saveDb = () => fs.writeFile(DB, JSON.stringify(db), () => {});
+db.cfg = db.cfg || {};
+const pending = new Map(); // token -> { prov, code, uid, name, chat, exp, tries }
+const rnd = n => crypto.randomBytes(n).toString('hex');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const sha = k => crypto.createHash('sha256').update(k).digest('hex');
+if (!db.admin) { db.admin = rnd(6); saveDb(); }
+console.log('Админ-код (для подключения ботов в игре):', db.admin);
+const gen = { tg: 0, max: 0 };
+
+/* ---- Бот получил /start <token>: генерируем код и шлём его пользователю ---- */
+async function onStart(prov, token, userId, name, chat) {
+  const p = pending.get(token);
+  if (!p || p.prov !== prov || p.exp < Date.now()) return send(prov, chat, 'Ссылка устарела. Вернитесь в игру и нажмите вход ещё раз.');
+  p.code = String(crypto.randomInt(100000, 1000000));
+  p.uid = prov + ':' + userId; p.name = name || 'Игрок'; p.chat = chat;
+  p.exp = Date.now() + 10 * 60 * 1000;
+  send(prov, chat, `Ваш код для входа в Hamster Combat: ${p.code}\nОн действует 10 минут. Никому его не говорите.`);
+}
+async function send(prov, chat, text) {
+  try {
+    if (prov === 'tg') await fetch(`https://api.telegram.org/bot${db.cfg.tg.token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text }) });
+    else await fetch(`https://platform-api.max.ru/messages?chat_id=${chat}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: db.cfg.max.token }, body: JSON.stringify({ text }) });
+  } catch (e) { console.error('send', prov, e.message); }
+}
+
+/* ---- Приём сообщений от ботов (long polling, домен и HTTPS не нужны) ---- */
+async function tgLoop() {
+  const my = ++gen.tg; let off = 0;
+  while (my === gen.tg) try {
+    const r = await (await fetch(`https://api.telegram.org/bot${db.cfg.tg.token}/getUpdates?timeout=30&offset=${off}`)).json();
+    for (const u of r.result || []) {
+      off = u.update_id + 1; const m = u.message;
+      if (m && m.text && m.text.startsWith('/start ')) onStart('tg', m.text.slice(7).trim(), m.from.id, m.from.first_name, m.chat.id);
+      else if (m && m.text === '/start') send('tg', m.chat.id, 'Откройте игру и нажмите «Войти через Telegram».');
+    }
+  } catch { await sleep(3000); }
+}
+async function maxLoop() {
+  const my = ++gen.max; let marker = '';
+  while (my === gen.max) try {
+    const r = await (await fetch(`https://platform-api.max.ru/updates?timeout=30&types=bot_started${marker ? '&marker=' + marker : ''}`, { headers: { Authorization: db.cfg.max.token } })).json();
+    if (r.marker) marker = r.marker;
+    for (const u of r.updates || []) if (u.update_type === 'bot_started' && u.payload)
+      onStart('max', String(u.payload).trim(), u.user.user_id, u.user.first_name || u.user.name, u.chat_id);
+  } catch { await sleep(3000); }
+}
+if (db.cfg.tg) tgLoop(); if (db.cfg.max) maxLoop();
+
+/* ---- HTTP API ---- */
+const byKey = key => key && Object.values(db.users).find(u => u.keyHash === sha(key));
+const json = (res, code, o) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type,X-Key' }); res.end(JSON.stringify(o)); };
+const body = req => new Promise(r => { let b = ''; req.on('data', c => { b += c; if (b.length > 2e5) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); });
+const hits = new Map(); // простой лимит запросов по IP
+const limited = ip => { const n = (hits.get(ip) || 0) + 1; hits.set(ip, n); return n > 120; };
+setInterval(() => hits.clear(), 60000);
+
+http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+  if (req.method === 'OPTIONS') return json(res, 204, {});
+  if (!url.pathname.startsWith('/api/')) { // отдаём игру
+    try { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(fs.readFileSync('hamster_combat.html')); }
+    catch { return json(res, 404, { error: 'нет hamster_combat.html' }); }
+  }
+  if (limited(req.socket.remoteAddress)) return json(res, 429, { error: 'слишком много запросов' });
+  const r = url.pathname.slice(5), u = byKey(req.headers['x-key']);
+  if (r === 'start' && req.method === 'POST') {
+    const { prov } = await body(req), token = rnd(8);
+    if (prov === 'tg' && db.cfg.tg) { pending.set(token, { prov, exp: Date.now() + 600000, tries: 0 }); return json(res, 200, { token, link: `https://t.me/${db.cfg.tg.bot}?start=${token}` }); }
+    if (prov === 'max' && db.cfg.max) { pending.set(token, { prov, exp: Date.now() + 600000, tries: 0 }); return json(res, 200, { token, link: `https://max.ru/${db.cfg.max.bot}?start=${token}` }); }
+    return json(res, 400, { error: 'этот бот не настроен' });
+  }
+  if (r === 'verify' && req.method === 'POST') {
+    const { token, code } = await body(req), p = pending.get(token);
+    if (!p || !p.code || p.exp < Date.now()) return json(res, 400, { error: 'сначала нажмите «Запустить» в боте' });
+    if (++p.tries > 5) { pending.delete(token); return json(res, 429, { error: 'слишком много попыток' }); }
+    if (String(code) !== p.code) return json(res, 400, { error: 'неверный код' });
+    pending.delete(token);
+    const key = rnd(24), isNew = !db.users[p.uid];
+    db.users[p.uid] = Object.assign(db.users[p.uid] || { id: p.uid, score: 0, save: '' }, { name: p.name, prov: p.prov, keyHash: sha(key) });
+    saveDb();
+    return json(res, 200, { key, uid: p.uid, name: p.name, prov: p.prov, isNew });
+  }
+  if (r === 'top') {
+    const n = Math.min(100, +url.searchParams.get('n') || 50);
+    const rows = Object.values(db.users).sort((a, b) => b.score - a.score).slice(0, n).map(x => ({ id: x.id, name: x.name, prov: x.prov, score: x.score }));
+    return json(res, 200, { rows });
+  }
+  if (r === 'admin' && req.method === 'POST') {
+    const b = await body(req);
+    if (String(b.pass) !== db.admin) return json(res, 403, { error: 'неверный админ-код' });
+    if (!['tg', 'max'].includes(b.prov) || !b.token) return json(res, 400, { error: 'нужен токен' });
+    try {
+      let bot = b.bot;
+      if (b.prov === 'tg') { const m = await (await fetch(`https://api.telegram.org/bot${b.token}/getMe`)).json(); if (!m.ok) throw 0; bot = m.result.username; }
+      else { const m = await (await fetch('https://platform-api.max.ru/me', { headers: { Authorization: b.token } })).json(); if (m.code || m.error) throw 0; bot = m.username || bot; if (!bot) return json(res, 400, { error: 'укажите имя бота Max' }); }
+      db.cfg[b.prov] = { token: b.token, bot }; saveDb();
+      if (b.prov === 'tg') tgLoop(); else maxLoop();
+      return json(res, 200, { ok: true, bot });
+    } catch { return json(res, 400, { error: 'токен не подошёл' }); }
+  }
+  if (!u) return json(res, 401, { error: 'нужен вход' });
+  if (r === 'me') return json(res, 200, { uid: u.id, name: u.name, prov: u.prov, data: { save: u.save, score: u.score } });
+  if (r === 'save' && req.method === 'POST') {
+    const b = await body(req);
+    if (typeof b.save === 'string' && b.save.length < 1e5) { u.save = b.save; u.score = Math.max(0, Math.floor(+b.score || 0)); saveDb(); }
+    return json(res, 200, { ok: true });
+  }
+  json(res, 404, { error: 'нет такого метода' });
+}).listen(PORT, () => console.log('Игра: http://localhost:' + PORT));
+</script>
+</body>
+</html>
